@@ -1,0 +1,83 @@
+:root {
+  --bg: #0b0f14;
+  --panel: rgba(14, 20, 28, 0.82);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #e8eef5;
+  --muted: #8a98a8;
+  --accent: #5ee0c1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.app {
+  position: relative;
+  height: 100%;
+}
+
+.panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1;
+  width: 280px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.panel h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.panel p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.species-select {
+  width: 100%;
+  margin-top: 16px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.species-select option {
+  color: #111;
+}
+
+.status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status .error {
+  color: #ff8a80;
+}
