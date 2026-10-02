@@ -81,3 +81,20 @@ body {
 .status .error {
   color: #ff8a80;
 }
+
+.legend {
+  margin-top: 16px;
+}
+
+.legend-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}

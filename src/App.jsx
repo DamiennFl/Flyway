@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getRecentObservations, getSpeciesObservations } from './api/ebird.js'
 import MigrationMap from './components/MigrationMap.jsx'
 import SpeciesSelect from './components/SpeciesSelect.jsx'
+import AgeLegend from './components/AgeLegend.jsx'
 
 const REGION = 'US'
 const MAX_RESULTS = 10000
@@ -57,6 +58,8 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {points.length > 0 && <AgeLegend />}
       </aside>
       <MigrationMap sightings={points} />
     </div>

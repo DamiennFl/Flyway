@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import Map, { Source, Layer } from 'react-map-gl/maplibre'
+import { AGE_COLOR_EXPRESSION, ageInDays } from '../lib/ageScale.js'
 
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
@@ -12,10 +13,13 @@ const INITIAL_VIEW = {
 const DOT_LAYER = {
   id: 'sightings',
   type: 'circle',
+  layout: {
+    'circle-sort-key': ['-', 0, ['get', 'ageDays']],
+  },
   paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 2, 8, 5],
-    'circle-color': '#5ee0c1',
-    'circle-opacity': 0.6,
+    'circle-color': AGE_COLOR_EXPRESSION,
+    'circle-opacity': 0.75,
     'circle-stroke-width': 0.5,
     'circle-stroke-color': '#0b0f14',
   },
@@ -28,7 +32,12 @@ export default function MigrationMap({ sightings = [] }) {
       features: sightings.map((s) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-        properties: { locName: s.locName, obsDt: s.obsDt, howMany: s.howMany },
+        properties: {
+          locName: s.locName,
+          obsDt: s.obsDt,
+          howMany: s.howMany,
+          ageDays: ageInDays(s.obsDt),
+        },
       })),
     }),
     [sightings],
