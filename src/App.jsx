@@ -1,36 +1,45 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getRecentObservations, getSpeciesObservations } from './api/ebird.js'
+import { getSpeciesObservations } from './api/ebird.js'
+import { getHistoricalSpecies, getMeta, getSpeciesIndex } from './api/historical.js'
+import { aggregateCells } from './lib/historical.js'
 import MigrationMap from './components/MigrationMap.jsx'
 import SpeciesSelect from './components/SpeciesSelect.jsx'
-import AgeLegend from './components/AgeLegend.jsx'
+import Legend from './components/Legend.jsx'
 
 const REGION = 'US'
 const MAX_RESULTS = 10000
 
 export default function App() {
   const [speciesCode, setSpeciesCode] = useState('')
+  const [view, setView] = useState('recent')
+  const [eraId, setEraId] = useState(null)
 
-  const recent = useQuery({
-    queryKey: ['recent', REGION],
-    queryFn: () => getRecentObservations(REGION),
-  })
+  const index = useQuery({ queryKey: ['species-index'], queryFn: getSpeciesIndex, staleTime: Infinity })
+  const meta = useQuery({ queryKey: ['meta'], queryFn: getMeta, staleTime: Infinity })
 
-  const species = useMemo(() => {
-    const byCode = new Map()
-    for (const obs of recent.data ?? []) {
-      if (!byCode.has(obs.speciesCode)) byCode.set(obs.speciesCode, obs)
-    }
-    return [...byCode.values()].sort((a, b) => a.comName.localeCompare(b.comName))
-  }, [recent.data])
+  const showingHistory = view === 'historical'
 
   const sightings = useQuery({
     queryKey: ['species', REGION, speciesCode],
     queryFn: () => getSpeciesObservations(speciesCode, REGION),
-    enabled: Boolean(speciesCode),
+    enabled: !showingHistory && Boolean(speciesCode),
   })
 
-  const points = sightings.data ?? []
+  const history = useQuery({
+    queryKey: ['historical', speciesCode],
+    queryFn: () => getHistoricalSpecies(speciesCode),
+    enabled: showingHistory && Boolean(speciesCode),
+    staleTime: Infinity,
+  })
+
+  const aggregated = useMemo(
+    () => (history.data ? aggregateCells(history.data, eraId) : { cells: [], total: 0, cellSize: 0.5 }),
+    [history.data, eraId],
+  )
+
+  const recentPoints = sightings.data ?? []
+  const hasPoints = showingHistory ? aggregated.cells.length > 0 : recentPoints.length > 0
 
   return (
     <div className="app">
@@ -39,29 +48,72 @@ export default function App() {
         <p>Bird migration, month by month.</p>
 
         <SpeciesSelect
-          species={species}
+          species={index.data ?? []}
           value={speciesCode}
           onChange={setSpeciesCode}
-          disabled={recent.isLoading || recent.isError}
+          disabled={index.isLoading || index.isError}
         />
 
+        {speciesCode && (
+          <button type="button" className="action" onClick={() => setView(showingHistory ? 'recent' : 'historical')}>
+            {showingHistory ? 'Back to last 30 days' : 'Show historical data'}
+          </button>
+        )}
+
+        {showingHistory && speciesCode && meta.data && (
+          <div className="eras">
+            {[{ id: null, label: 'All years' }, ...meta.data.eras].map((era) => (
+              <button
+                key={era.label}
+                type="button"
+                className={`era${eraId === era.id ? ' active' : ''}`}
+                onClick={() => setEraId(era.id)}
+              >
+                {era.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="status">
-          {recent.isLoading && 'Loading species…'}
-          {recent.isError && <span className="error">{recent.error.message}</span>}
-          {recent.data && `${species.length} species in the last 30 days`}
-          {speciesCode && sightings.isFetching && <div>Loading sightings…</div>}
-          {sightings.isError && <div className="error">{sightings.error.message}</div>}
-          {sightings.data && (
+          {index.isLoading && 'Loading species…'}
+          {index.isError && <span className="error">{index.error.message}</span>}
+          {index.data && `${index.data.length.toLocaleString()} species`}
+
+          {!showingHistory && speciesCode && sightings.isFetching && <div>Loading sightings…</div>}
+          {!showingHistory && sightings.isError && <div className="error">{sightings.error.message}</div>}
+          {!showingHistory && sightings.data && (
             <div>
-              {points.length.toLocaleString()} sightings
-              {points.length >= MAX_RESULTS && ' (hit the 10,000 cap)'}
+              {recentPoints.length >= MAX_RESULTS && '>'}
+              {recentPoints.length.toLocaleString()} sightings in the US, last 30 days
+            </div>
+          )}
+
+          {showingHistory && speciesCode && history.isFetching && <div>Loading historical data…</div>}
+          {showingHistory && history.isError && <div className="error">{history.error.message}</div>}
+          {showingHistory && history.data && (
+            <div>
+              {aggregated.cells.length.toLocaleString()} map cells · {aggregated.total.toLocaleString()} records
             </div>
           )}
         </div>
 
-        {points.length > 0 && <AgeLegend />}
+        {hasPoints && <Legend mode={view} />}
+
+        {showingHistory && history.data && (
+          <p className="note">
+            eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, through 2024. Counts reflect where people
+            bird, not just where birds are.
+          </p>
+        )}
       </aside>
-      <MigrationMap sightings={points} />
+      <MigrationMap
+        mode={view}
+        sightings={recentPoints}
+        cells={aggregated.cells}
+        cellSize={aggregated.cellSize}
+        fitKey={history.data}
+      />
     </div>
   )
 }
