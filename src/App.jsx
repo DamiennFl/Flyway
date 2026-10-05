@@ -18,6 +18,8 @@ import MigrationMap from './components/MigrationMap.jsx'
 import SpeciesSelect from './components/SpeciesSelect.jsx'
 import SeasonPanel from './components/SeasonPanel.jsx'
 import Legend from './components/Legend.jsx'
+import TopBar from './components/TopBar.jsx'
+import TrendsPanel from './components/TrendsPanel.jsx'
 
 const REGION = 'US'
 const MAX_RESULTS = 10000
@@ -56,9 +58,15 @@ export default function App() {
   const [week, setWeek] = useState(1)
   const [playing, setPlaying] = useState(false)
   const [bounds, setBounds] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [trendsOpen, setTrendsOpen] = useState(false)
 
   const index = useQuery({ queryKey: ['species-index'], queryFn: getSpeciesIndex, staleTime: Infinity })
   const meta = useQuery({ queryKey: ['meta'], queryFn: getMeta, staleTime: Infinity })
+
+  useEffect(() => {
+    setView('recent')
+  }, [speciesCode])
 
   const showingHistory = view === 'historical'
   const needsWeekly = showingHistory && (lens === 'week' || lens === 'wave') && Boolean(speciesCode)
@@ -161,6 +169,13 @@ export default function App() {
 
   return (
     <div className="app">
+      <TopBar
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        trendsOpen={trendsOpen}
+        onToggleTrends={() => setTrendsOpen((o) => !o)}
+      />
+      {sidebarOpen && (
       <aside className="panel">
         <h1>Flyway</h1>
         <p>Bird migration, month by month.</p>
@@ -301,6 +316,15 @@ export default function App() {
           <p className="note">{NOTES[lens]}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, through 2024.</p>
         )}
       </aside>
+      )}
+      <TrendsPanel
+        open={trendsOpen}
+        onClose={() => setTrendsOpen(false)}
+        species={index.data ?? []}
+        speciesCode={speciesCode}
+        onSpeciesChange={setSpeciesCode}
+        speciesDisabled={index.isLoading || index.isError}
+      />
       <MigrationMap
         mode={view}
         sightings={recentPoints}
