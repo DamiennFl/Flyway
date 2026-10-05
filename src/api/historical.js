@@ -8,4 +8,7 @@ async function getJson(path) {
 
 export const getSpeciesIndex = () => getJson('index.json.gz')
 export const getMeta = () => getJson('meta.json')
+export const getEffort = () => getJson('effort.json.gz')
+export const getEffortFine = () => getJson('effort-fine.json.gz')
 export const getHistoricalSpecies = (code) => getJson(`range-fine/${code}.json.gz`)
+export const getWeeklySpecies = (code) => getJson(`species/${code}.json.gz`)

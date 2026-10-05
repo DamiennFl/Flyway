@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Map, { Source, Layer } from 'react-map-gl/maplibre'
 import { AGE_COLOR_EXPRESSION, ageInDays } from '../lib/ageScale.js'
-import { DENSITY_COLOR_EXPRESSION } from '../lib/densityScale.js'
+import { PALETTES } from '../lib/palettes.js'
 
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
@@ -10,10 +10,6 @@ const INITIAL_VIEW = {
   latitude: 39,
   zoom: 3.2,
 }
-
-// Zoomed far out, a 0.1 degree cell is under a pixel wide and map tiling drops polygons that small, so cells
-// are drawn as dots there. From this zoom on they are drawn as real squares (dots leave gaps between rows).
-const CELL_SQUARE_ZOOM = 4
 
 const RECENT_LAYER = {
   id: 'sightings',
@@ -28,24 +24,37 @@ const RECENT_LAYER = {
   },
 }
 
-const CELL_DOT_LAYER = {
-  id: 'cell-dots',
-  type: 'circle',
-  maxzoom: CELL_SQUARE_ZOOM,
-  layout: { 'circle-sort-key': ['get', 'n'] },
-  paint: {
-    'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 0.8, 3, 0.8, CELL_SQUARE_ZOOM, 1.3],
-    'circle-color': DENSITY_COLOR_EXPRESSION,
-    'circle-opacity': 0.9,
-  },
-}
+// Zoomed far out, a cell is under a pixel wide and map tiling drops polygons that small, so cells are drawn
+// as dots there. From the switch zoom on they are drawn as real squares (dots leave gaps between rows).
+const squareZoomFor = (cellSize) => (cellSize >= 0.5 ? 2 : 4)
 
-const CELL_SQUARE_LAYER = {
-  id: 'cell-squares',
-  type: 'fill',
-  minzoom: CELL_SQUARE_ZOOM,
-  layout: { 'fill-sort-key': ['get', 'n'] },
-  paint: { 'fill-color': DENSITY_COLOR_EXPRESSION, 'fill-opacity': 0.9, 'fill-antialias': false },
+// Dots beyond this many are thinned (the same cells every time, so nothing flickers) and drawn larger.
+const MAX_DOTS = 40000
+
+const keepDot = (c, stride) =>
+  stride === 1 || ((((Math.round(c.lat * 10) * 73856093) ^ (Math.round(c.lng * 10) * 19349663)) >>> 0) % stride) === 0
+
+function cellLayers(squareZoom, color, dotScale) {
+  return {
+    dots: {
+      id: 'cell-dots',
+      type: 'circle',
+      maxzoom: squareZoom,
+      layout: { 'circle-sort-key': ['get', 'n'] },
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 0.8 * dotScale, squareZoom, 1.3 * dotScale],
+        'circle-color': color,
+        'circle-opacity': 0.9,
+      },
+    },
+    squares: {
+      id: 'cell-squares',
+      type: 'fill',
+      minzoom: squareZoom,
+      layout: { 'fill-sort-key': ['get', 'n'] },
+      paint: { 'fill-color': color, 'fill-opacity': 0.9, 'fill-antialias': false },
+    },
+  }
 }
 
 // Range covering the central 98% of cells, so a few stray cells don't force a world-wide zoom.
@@ -61,15 +70,36 @@ function cellPolygon(c, half) {
 }
 
 const collection = (features) => ({ type: 'FeatureCollection', features })
+const EMPTY = collection([])
 
-export default function MigrationMap({ mode = 'recent', sightings = [], cells = [], cellSize = 0.1, fitKey }) {
+// stableCount: how many cells this species has in the current view mode regardless of week, so thinning
+// does not change as the week does.
+export default function MigrationMap({
+  mode = 'recent',
+  sightings = [],
+  cells = [],
+  stableCount = cells.length,
+  cellSize = 0.1,
+  palette = 'density',
+  fitCells = [],
+  fitKey,
+  onBoundsChange,
+}) {
   const mapRef = useRef(null)
+  const [view, setView] = useState({ zoom: INITIAL_VIEW.zoom, bounds: null })
+  const squareZoom = squareZoomFor(cellSize)
+  const stride = Math.max(1, Math.ceil(stableCount / MAX_DOTS))
+  const dotScale = Math.min(2.2, Math.sqrt(stride))
+  const layers = useMemo(
+    () => cellLayers(squareZoom, PALETTES[palette].expression, dotScale),
+    [squareZoom, palette, dotScale],
+  )
 
-  // Zoom to the species' range when its historical data loads (not when the era filter changes).
+  // Zoom to the species' range when its historical data loads (not when the era filter or week changes).
   useEffect(() => {
-    if (mode !== 'historical' || cells.length === 0) return
-    const [west, east] = centralRange(cells, 'lng')
-    const [south, north] = centralRange(cells, 'lat')
+    if (mode !== 'historical' || fitCells.length === 0) return
+    const [west, east] = centralRange(fitCells, 'lng')
+    const [south, north] = centralRange(fitCells, 'lat')
     const left = window.innerWidth > 700 ? 340 : 40
     mapRef.current?.fitBounds([[west, south], [east, north]], {
       padding: { top: 50, bottom: 50, left, right: 50 },
@@ -77,6 +107,13 @@ export default function MigrationMap({ mode = 'recent', sightings = [], cells = 
       duration: 700,
     })
   }, [mode, fitKey])
+
+  function reportView(e) {
+    const b = e.target.getBounds()
+    const bounds = { west: Math.max(-180, b.getWest()), east: Math.min(180, b.getEast()), south: b.getSouth(), north: b.getNorth() }
+    setView({ zoom: e.target.getZoom(), bounds })
+    onBoundsChange?.(bounds)
+  }
 
   const recentData = useMemo(
     () =>
@@ -90,28 +127,49 @@ export default function MigrationMap({ mode = 'recent', sightings = [], cells = 
     [sightings],
   )
 
+  // Only the layer that is visible at the current zoom is built, and squares only for cells in (or near) view,
+  // so large species stay fast when the week changes.
+  const showSquares = view.zoom >= squareZoom
+
   const cellDots = useMemo(
     () =>
-      collection(
-        cells.map((c) => ({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
-          properties: { n: c.n, t: c.t },
-        })),
-      ),
-    [cells],
+      showSquares
+        ? EMPTY
+        : collection(
+            cells
+              .filter((c) => keepDot(c, stride))
+              .map((c) => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+                properties: { n: c.n, t: c.t },
+              })),
+          ),
+    [cells, showSquares, stride],
   )
 
-  const cellSquares = useMemo(
-    () =>
-      collection(
-        cells.map((c) => ({ type: 'Feature', geometry: cellPolygon(c, cellSize / 2), properties: { n: c.n, t: c.t } })),
-      ),
-    [cells, cellSize],
-  )
+  const cellSquares = useMemo(() => {
+    if (!showSquares || !view.bounds) return EMPTY
+    const { west, east, south, north } = view.bounds
+    const padLng = (east - west) / 2
+    const padLat = (north - south) / 2
+    return collection(
+      cells
+        .filter(
+          (c) => c.lng >= west - padLng && c.lng <= east + padLng && c.lat >= south - padLat && c.lat <= north + padLat,
+        )
+        .map((c) => ({ type: 'Feature', geometry: cellPolygon(c, cellSize / 2), properties: { n: c.n, t: c.t } })),
+    )
+  }, [cells, cellSize, showSquares, view.bounds])
 
   return (
-    <Map ref={mapRef} initialViewState={INITIAL_VIEW} mapStyle={MAP_STYLE} style={{ width: '100%', height: '100%' }}>
+    <Map
+      ref={mapRef}
+      initialViewState={INITIAL_VIEW}
+      mapStyle={MAP_STYLE}
+      style={{ width: '100%', height: '100%' }}
+      onLoad={reportView}
+      onMoveEnd={reportView}
+    >
       {mode === 'recent' ? (
         <Source key="sightings" id="sightings" type="geojson" data={recentData}>
           <Layer {...RECENT_LAYER} />
@@ -119,10 +177,10 @@ export default function MigrationMap({ mode = 'recent', sightings = [], cells = 
       ) : (
         <>
           <Source key="cell-dots" id="cell-dots" type="geojson" data={cellDots}>
-            <Layer {...CELL_DOT_LAYER} />
+            <Layer key={`dots-${squareZoom}-${palette}-${dotScale}`} {...layers.dots} />
           </Source>
           <Source key="cell-squares" id="cell-squares" type="geojson" data={cellSquares}>
-            <Layer {...CELL_SQUARE_LAYER} />
+            <Layer key={`squares-${squareZoom}-${palette}`} {...layers.squares} />
           </Source>
         </>
       )}
