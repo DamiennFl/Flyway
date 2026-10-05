@@ -11,6 +11,7 @@ Output (upload with Content-Type application/json and Content-Encoding gzip):
 
 In a species file, lat/lng are cell indices: degrees = index * cell (cell = 0.5), i.e. the
 cell centre. n is the number of eBird records in that cell/week/era (not individual birds).
+country is the ISO country code of each record, parallel to era/week/lat/lng/n.
 Names are matched to eBird's current taxonomy; the rest are listed in publish_report.json.
 """
 import argparse
@@ -125,7 +126,7 @@ def main():
                                        JOIN name_to_code m ON c.species = m.ebird_name GROUP BY 1, 2 ORDER BY 1, 3 DESC""").fetchall():
         countries[code].append([cc, n])
 
-    order = "ORDER BY p.era, p.week, p.clat, p.clon"
+    order = "ORDER BY p.era, p.week, p.clat, p.clon, p.country"
     index, total_bytes, largest, published_records = [], 0, ("", 0), 0
     start = time.time()
     for k in parts:
@@ -134,7 +135,7 @@ def main():
             SELECT m.code, sum(p.n)::BIGINT, count(*)::BIGINT,
                    to_json(list(p.era {order}))::VARCHAR, to_json(list(p.week {order}))::VARCHAR,
                    to_json(list(p.clat {order}))::VARCHAR, to_json(list(p.clon {order}))::VARCHAR,
-                   to_json(list(p.n {order}))::VARCHAR
+                   to_json(list(p.country {order}))::VARCHAR, to_json(list(p.n {order}))::VARCHAR
             FROM read_parquet('{path}') p JOIN name_to_code m ON p.species = m.ebird_name
             GROUP BY m.code""")
         count = 0
@@ -142,12 +143,12 @@ def main():
             batch = cur.fetchmany(50)
             if not batch:
                 break
-            for code, records, rows, era, week, lat, lng, n in batch:
+            for code, records, rows, era, week, lat, lng, country, n in batch:
                 t = info[code]
                 head = json.dumps({"code": code, "name": t["comName"], "sci": t["sciName"], "cell": CELL, "records": records, "rows": rows},
                                   separators=(",", ":"), ensure_ascii=False)[:-1]
                 yrs = {"year": years[code][0], "n": years[code][1]}
-                text = (f'{head},"era":{era},"week":{week},"lat":{lat},"lng":{lng},"n":{n},'
+                text = (f'{head},"era":{era},"week":{week},"lat":{lat},"lng":{lng},"country":{country},"n":{n},'
                         f'"years":{json.dumps(yrs, separators=(",", ":"))},"countries":{json.dumps(countries[code][:10], separators=(",", ":"))}}}')
                 out = os.path.join(species_dir, f"{code}.json.gz")
                 write_gz(out, text)
@@ -169,7 +170,8 @@ def main():
         "source": {"name": ds.get("title"), "gbifDataset": EBIRD_DATASET, "license": ds.get("license"),
                    "citation": (ds.get("citation") or {}).get("text"), "lastYearCovered": 2024},
         "cellDegrees": CELL, "weeks": 52, "eras": ERAS, "species": len(index),
-        "format": "species/{code}.json.gz: arrays era, week, lat, lng, n sorted by era, week, lat, lng; degrees = index * cellDegrees; n = eBird records",
+        "format": "species/{code}.json.gz: arrays era, week, lat, lng, country, n sorted by era, week, lat, lng, country; "
+                  "degrees = index * cellDegrees; country = ISO country code; n = eBird records",
     }
     json.dump(meta, open(os.path.join(args.out, "meta.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 

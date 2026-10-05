@@ -29,7 +29,8 @@ BUCKETS = 8
 
 
 def ingest(con, files, scale):
-    con.execute("""CREATE TABLE IF NOT EXISTS partial (species VARCHAR, era UTINYINT, clat SMALLINT, clon SMALLINT, n INTEGER)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS partial
+                   (species VARCHAR, era UTINYINT, clat SMALLINT, clon SMALLINT, country VARCHAR, n INTEGER)""")
     con.execute("CREATE TABLE IF NOT EXISTS done_batches (batch INTEGER PRIMARY KEY, files INTEGER, seconds DOUBLE)")
     done = {r[0] for r in con.execute("SELECT batch FROM done_batches").fetchall()}
     batches = [files[i:i + BATCH_FILES] for i in range(0, len(files), BATCH_FILES)]
@@ -43,8 +44,8 @@ def ingest(con, files, scale):
         con.execute("BEGIN")
         con.execute(f"""
             INSERT INTO partial
-            SELECT ebird_name, {ERA} AS era, clat, clon, count(*)::INTEGER FROM (
-              SELECT verbatimscientificname AS ebird_name, year::SMALLINT AS year,
+            SELECT ebird_name, {ERA} AS era, clat, clon, country, count(*)::INTEGER FROM (
+              SELECT verbatimscientificname AS ebird_name, countrycode AS country, year::SMALLINT AS year,
                      round(decimallatitude * {scale})::SMALLINT AS clat,
                      round(decimallongitude * {scale})::SMALLINT AS clon
               FROM read_parquet({lst}, union_by_name=true)
@@ -70,8 +71,8 @@ def write_parts(con, out):
             continue
         t0 = time.time()
         tmp = (path + ".tmp").replace("\\", "/")
-        con.execute(f"""COPY (SELECT species, era, clat, clon, sum(n)::INTEGER AS n FROM partial
-                         WHERE hash(species) % {BUCKETS} = {k} GROUP BY ALL ORDER BY species, era, clat, clon)
+        con.execute(f"""COPY (SELECT species, era, clat, clon, country, sum(n)::INTEGER AS n FROM partial
+                         WHERE hash(species) % {BUCKETS} = {k} GROUP BY ALL ORDER BY species, era, clat, clon, country)
                         TO '{tmp}' (FORMAT parquet, COMPRESSION zstd)""")
         os.replace(tmp, path)
         log(f"species_era_cell slice {k + 1}/{BUCKETS}: {os.path.getsize(path) / 1e6:,.1f} MB ({time.time() - t0:.0f}s)")
@@ -91,11 +92,12 @@ def publish(con, glob, names_dir, publish_dir, full_run, cell, layer):
 
     range_dir = os.path.join(publish_dir, layer)
     os.makedirs(range_dir, exist_ok=True)
-    order = "ORDER BY p.era, p.clat, p.clon"
+    order = "ORDER BY p.era, p.clat, p.clon, p.country"
     cur = con.execute(f"""
         SELECT m.code, sum(p.n)::BIGINT, count(*)::BIGINT,
                to_json(list(p.era {order}))::VARCHAR, to_json(list(p.clat {order}))::VARCHAR,
-               to_json(list(p.clon {order}))::VARCHAR, to_json(list(p.n {order}))::VARCHAR
+               to_json(list(p.clon {order}))::VARCHAR, to_json(list(p.country {order}))::VARCHAR,
+               to_json(list(p.n {order}))::VARCHAR
         FROM read_parquet('{glob}') p JOIN name_to_code m ON p.species = m.ebird_name
         GROUP BY m.code""")
     files = total_bytes = published = 0
@@ -105,12 +107,12 @@ def publish(con, glob, names_dir, publish_dir, full_run, cell, layer):
         batch = cur.fetchmany(50)
         if not batch:
             break
-        for code, records, rows, era, lat, lng, n in batch:
+        for code, records, rows, era, lat, lng, country, n in batch:
             t = info[code]
             head = json.dumps({"code": code, "name": t["comName"], "sci": t["sciName"], "cell": cell, "records": records, "rows": rows},
                               separators=(",", ":"), ensure_ascii=False)[:-1]
             out = os.path.join(range_dir, f"{code}.json.gz")
-            write_gz(out, f'{head},"era":{era},"lat":{lat},"lng":{lng},"n":{n}}}')
+            write_gz(out, f'{head},"era":{era},"lat":{lat},"lng":{lng},"country":{country},"n":{n}}}')
             size = os.path.getsize(out)
             total_bytes += size
             largest = max(largest, (code, size), key=lambda x: x[1])
@@ -125,8 +127,9 @@ def publish(con, glob, names_dir, publish_dir, full_run, cell, layer):
         meta = json.load(open(meta_path, encoding="utf-8"))
         meta.setdefault("layers", {"weekly": {"path": "species/", "cellDegrees": 0.5, "weeks": 52}})
         meta["layers"][layer] = {"path": f"{layer}/", "cellDegrees": cell, "weeks": None}
-        meta["format"] = ("species/{code}.json.gz (weekly layer): era, week, lat, lng, n. "
-                          "{layer}/{code}.json.gz (range layers, no weeks): era, lat, lng, n. "
+        meta["format"] = ("species/{code}.json.gz (weekly layer): era, week, lat, lng, country, n. "
+                          "{layer}/{code}.json.gz (range layers, no weeks): era, lat, lng, country, n. "
+                          "country is the ISO country code of each record. "
                           "Sorted by their columns in that order; degrees = index * layers[layer].cellDegrees; n = eBird records.")
         json.dump(meta, open(meta_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
         log("meta.json updated with layer info")

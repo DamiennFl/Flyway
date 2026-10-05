@@ -42,9 +42,9 @@ ERA = "(CASE WHEN year < 2000 THEN 0 WHEN year < 2010 THEN 1 WHEN year < 2015 TH
 BUCKETS = 16
 BUCKETED_TABLE = "species_era_week_cell"
 BUCKET_QUERY = f"""
-    SELECT species, {ERA} AS era, week, clat, clon, count(*)::INTEGER AS n
+    SELECT species, {ERA} AS era, week, clat, clon, country, count(*)::INTEGER AS n
     FROM eb WHERE hash(species) % {BUCKETS} = {{k}}
-    GROUP BY ALL ORDER BY species, era, week, clat, clon"""
+    GROUP BY ALL ORDER BY species, era, week, clat, clon, country"""
 
 TABLES = {
     "effort_era_week_cell": f"""

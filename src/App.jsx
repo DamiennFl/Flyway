@@ -9,7 +9,7 @@ import {
   getSpeciesIndex,
   getWeeklySpecies,
 } from './api/historical.js'
-import { aggregateCells } from './lib/historical.js'
+import { aggregateCells, filterByCountry } from './lib/historical.js'
 import { buildEffortIndex, buildSpeciesSeason, regionSeries, weekLabel, WEEKS } from './lib/season.js'
 import { buildInterpolation, waveCellsFine, weekCellsFine } from './lib/fineField.js'
 import { buildEraCounts, compareEras } from './lib/compare.js'
@@ -99,11 +99,14 @@ export default function App() {
   const effort = useQuery({ queryKey: ['effort'], queryFn: getEffort, enabled: needsWeekly, staleTime: Infinity })
   const effortFine = useQuery({ queryKey: ['effort-fine'], queryFn: getEffortFine, enabled: needsFine, staleTime: Infinity })
 
+  const historyData = useMemo(() => filterByCountry(history.data, countryFilter), [history.data, countryFilter])
+  const weeklyData = useMemo(() => filterByCountry(weekly.data, countryFilter), [weekly.data, countryFilter])
+
   const aggregated = useMemo(
-    () => (history.data ? aggregateCells(history.data, eraId) : { cells: [], total: 0, cellSize: 0.1 }),
-    [history.data, eraId],
+    () => (historyData ? aggregateCells(historyData, eraId) : { cells: [], total: 0, cellSize: 0.1 }),
+    [historyData, eraId],
   )
-  const fineAll = useMemo(() => (history.data ? aggregateCells(history.data, null) : null), [history.data])
+  const fineAll = useMemo(() => (historyData ? aggregateCells(historyData, null) : null), [historyData])
 
   const effortIndex = useMemo(() => (effort.data ? buildEffortIndex(effort.data) : null), [effort.data])
   const fineIndex = useMemo(() => (effortFine.data ? buildEffortIndex(effortFine.data) : null), [effortFine.data])
@@ -111,16 +114,16 @@ export default function App() {
     () => (fineAll && effortIndex ? buildInterpolation(fineAll.cells, effortIndex) : null),
     [fineAll, effortIndex],
   )
-  const ready = needsWeekly && Boolean(weekly.data && effortIndex && interp)
-  const compareReady = needsFine && Boolean(history.data && fineIndex)
+  const ready = needsWeekly && Boolean(weeklyData && effortIndex && interp)
+  const compareReady = needsFine && Boolean(historyData && fineIndex)
 
   const season = useMemo(
-    () => (weekly.data && effortIndex ? buildSpeciesSeason(weekly.data, effortIndex) : null),
-    [weekly.data, effortIndex],
+    () => (weeklyData && effortIndex ? buildSpeciesSeason(weeklyData, effortIndex) : null),
+    [weeklyData, effortIndex],
   )
   const eraCounts = useMemo(
-    () => (compareReady ? buildEraCounts(history.data, fineIndex) : null),
-    [compareReady, history.data, fineIndex],
+    () => (compareReady ? buildEraCounts(historyData, fineIndex) : null),
+    [compareReady, historyData, fineIndex],
   )
   const wave = useMemo(() => (lens === 'wave' && season ? buildWave(season, effortIndex) : null), [lens, season, effortIndex])
 
@@ -340,7 +343,7 @@ export default function App() {
         cellSize={displayCellSize}
         palette={palette}
         fitCells={aggregated.cells}
-        fitKey={history.data}
+        fitKey={historyData}
         onBoundsChange={setBounds}
       />
     </div>
