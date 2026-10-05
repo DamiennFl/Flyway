@@ -331,7 +331,7 @@ body {
 .trends {
   position: fixed;
   z-index: 3;
-  width: 280px;
+  width: 360px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -342,6 +342,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -349,6 +350,65 @@ body {
   border-bottom: 1px solid var(--border);
   cursor: move;
   touch-action: none;
+}
+
+.trends-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trends-sci {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.trends-stats {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.trends-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trends-stat-label {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.trends-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.trends-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.trends-toggle {
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .trends-close {
@@ -380,17 +440,16 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  margin-top: 12px;
+  margin-top: 6px;
 }
 
 .trends-chart .bar {
-  fill: rgba(138, 152, 168, 0.55);
+  fill: rgba(94, 224, 193, 0.65);
 }
 
-.trends-range {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--muted);
+.trends-chart text {
+  font-size: 7px;
+  fill: var(--muted);
 }
 
 .trends-countries {
