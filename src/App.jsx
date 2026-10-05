@@ -20,8 +20,9 @@ import SeasonPanel from './components/SeasonPanel.jsx'
 import Legend from './components/Legend.jsx'
 import TopBar from './components/TopBar.jsx'
 import TrendsPanel from './components/TrendsPanel.jsx'
+import { countryName } from './lib/countries.js'
 
-const REGION = 'US'
+const DEFAULT_REGION = 'US'
 const MAX_RESULTS = 10000
 const PLAY_INTERVAL_MS = 350
 
@@ -60,6 +61,7 @@ export default function App() {
   const [bounds, setBounds] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [trendsOpen, setTrendsOpen] = useState(false)
+  const [countryFilter, setCountryFilter] = useState(null)
 
   const index = useQuery({ queryKey: ['species-index'], queryFn: getSpeciesIndex, staleTime: Infinity })
   const meta = useQuery({ queryKey: ['meta'], queryFn: getMeta, staleTime: Infinity })
@@ -72,10 +74,11 @@ export default function App() {
   const needsWeekly = showingHistory && (lens === 'week' || lens === 'wave') && Boolean(speciesCode)
   const needsFine = showingHistory && lens === 'compare' && Boolean(speciesCode)
   const slider = lens === 'week' || lens === 'wave'
+  const region = countryFilter ?? DEFAULT_REGION
 
   const sightings = useQuery({
-    queryKey: ['species', REGION, speciesCode],
-    queryFn: () => getSpeciesObservations(speciesCode, REGION),
+    queryKey: ['species', region, speciesCode],
+    queryFn: () => getSpeciesObservations(speciesCode, region),
     enabled: !showingHistory && Boolean(speciesCode),
   })
 
@@ -185,6 +188,8 @@ export default function App() {
           value={speciesCode}
           onChange={setSpeciesCode}
           disabled={index.isLoading || index.isError}
+          countryFilter={countryFilter}
+          onCountryFilterChange={setCountryFilter}
         />
 
         {speciesCode && (
@@ -274,7 +279,7 @@ export default function App() {
           {!showingHistory && sightings.data && (
             <div>
               {recentPoints.length >= MAX_RESULTS && '>'}
-              {recentPoints.length.toLocaleString()} sightings in the US, last 30 days
+              {recentPoints.length.toLocaleString()} sightings in {countryName(region)}, last 30 days
             </div>
           )}
 
@@ -324,6 +329,8 @@ export default function App() {
         speciesCode={speciesCode}
         onSpeciesChange={setSpeciesCode}
         speciesDisabled={index.isLoading || index.isError}
+        countryFilter={countryFilter}
+        onCountryFilterChange={setCountryFilter}
       />
       <MigrationMap
         mode={view}

@@ -7,7 +7,16 @@ const CHART_HEIGHT = 90
 const BAR = 12
 const RECENT_START = 2000
 
-export default function TrendsPanel({ open, onClose, species, speciesCode, onSpeciesChange, speciesDisabled }) {
+export default function TrendsPanel({
+  open,
+  onClose,
+  species,
+  speciesCode,
+  onSpeciesChange,
+  speciesDisabled,
+  countryFilter,
+  onCountryFilterChange,
+}) {
   const [pos, setPos] = useState({ x: 312, y: 16 })
   const [fullHistory, setFullHistory] = useState(false)
   const dragRef = useRef(null)
@@ -66,7 +75,14 @@ export default function TrendsPanel({ open, onClose, species, speciesCode, onSpe
         </button>
       </div>
       <div className="trends-body">
-        <SpeciesSelect species={species} value={speciesCode} onChange={onSpeciesChange} disabled={speciesDisabled} />
+        <SpeciesSelect
+          species={species}
+          value={speciesCode}
+          onChange={onSpeciesChange}
+          disabled={speciesDisabled}
+          countryFilter={countryFilter}
+          onCountryFilterChange={onCountryFilterChange}
+        />
 
         {!speciesCode && <p className="trends-note">Pick a species to see its trend.</p>}
         {speciesCode && trends.isLoading && <p className="trends-note">Loading…</p>}
@@ -115,6 +131,10 @@ export default function TrendsPanel({ open, onClose, species, speciesCode, onSpe
                 ) : null,
               )}
             </svg>
+            <div className="trends-chart-note">
+              eBird reports were sparse before 2000 — counts are not a reliable gauge of the species' actual range
+              or abundance that far back.
+            </div>
           </>
         )}
 
