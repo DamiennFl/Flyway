@@ -45,7 +45,8 @@ export default function SpeciesSelect({ species, value, onChange, disabled, coun
   const countryMatches = useMemo(() => {
     const q = countryQuery.trim().toLowerCase()
     const named = (countryIndex.data ?? []).map((e) => ({ ...e, label: countryName(e.cc) }))
-    return (q ? named.filter((e) => e.label.toLowerCase().includes(q)) : named).slice(0, 50)
+    // Unlike species (10,761 of them), the country list is small enough (~250) to show in full.
+    return q ? named.filter((e) => e.label.toLowerCase().includes(q)) : named
   }, [countryIndex.data, countryQuery])
 
   function choose(s) {

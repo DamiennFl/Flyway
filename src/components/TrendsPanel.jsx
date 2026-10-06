@@ -1,11 +1,32 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getWeeklySpecies } from '../api/historical.js'
+import { speciesUrl } from '../api/ebird.js'
+import { getEffortCountry, getWeeklySpecies } from '../api/historical.js'
+import { countryName } from '../lib/countries.js'
+import { COUNTRY_LINE_COLORS, bestTimePlace, buildCountryWeekShare, scaleForDisplay } from '../lib/flyway.js'
+import { pieSlices } from '../lib/pie.js'
+import { WEEKS, weekLabel } from '../lib/season.js'
 import SpeciesSelect from './SpeciesSelect.jsx'
 
 const CHART_HEIGHT = 90
 const BAR = 12
 const RECENT_START = 2000
+
+const FLYWAY_HEIGHT = 56
+const FLYWAY_BAR = 5
+const MONTH_STARTS = [[1, 'Jan'], [14, 'Apr'], [27, 'Jul'], [40, 'Oct']]
+
+const PIE_MAX = 8
+const PIE_COLORS = [...COUNTRY_LINE_COLORS, '#9b7ede', '#6ec1e4', '#e0e0e0', '#7a8190']
+
+function slicePath(start, end) {
+  const x1 = Math.cos(start)
+  const y1 = Math.sin(start)
+  const x2 = Math.cos(end)
+  const y2 = Math.sin(end)
+  const large = end - start > Math.PI ? 1 : 0
+  return `M0,0 L${x1},${y1} A1,1 0 ${large} 1 ${x2},${y2} Z`
+}
 
 export default function TrendsPanel({
   open,
@@ -17,14 +38,21 @@ export default function TrendsPanel({
   countryFilter,
   onCountryFilterChange,
 }) {
-  const [pos, setPos] = useState({ x: 312, y: 16 })
+  const [pos, setPos] = useState({ x: 312, y: 70 })
   const [fullHistory, setFullHistory] = useState(false)
+  const [logScale, setLogScale] = useState(false)
   const dragRef = useRef(null)
 
   const trends = useQuery({
     queryKey: ['trends', speciesCode],
     queryFn: () => getWeeklySpecies(speciesCode),
     enabled: open && Boolean(speciesCode),
+    staleTime: Infinity,
+  })
+  const effortCountry = useQuery({
+    queryKey: ['effort-country'],
+    queryFn: getEffortCountry,
+    enabled: open,
     staleTime: Infinity,
   })
 
@@ -57,8 +85,28 @@ export default function TrendsPanel({
   const maxN = chartYears.length ? Math.max(...chartYears.map((d) => d.n)) : 0
   const tickEvery = fullHistory ? 20 : 5
 
+  const flyway =
+    data && effortCountry.data && countries.length
+      ? buildCountryWeekShare(data, effortCountry.data, countries)
+      : null
+  const flywayScaled = flyway
+    ? flyway.series.map((s) => s.values.map((v) => scaleForDisplay(v, logScale)))
+    : []
+  const flywayMax = flywayScaled.length ? Math.max(0, ...flywayScaled.flat()) : 0
+
+  const allCountryShare =
+    data && effortCountry.data && countries.length
+      ? buildCountryWeekShare(data, effortCountry.data, countries, countries.length)
+      : null
+  const pieTop = countries.slice(0, PIE_MAX)
+  const pieRest = countries.slice(PIE_MAX).reduce((sum, [, n]) => sum + n, 0)
+  const pieCountries = pieRest > 0 ? [...pieTop, ['Other', pieRest]] : pieTop
+  const pieTotal = pieCountries.reduce((sum, [, n]) => sum + n, 0)
+
+  const best = allCountryShare ? bestTimePlace(allCountryShare.series) : null
+
   return (
-    <div className="trends" style={{ left: pos.x, top: pos.y }}>
+    <div className={`trends${years ? ' trends-wide' : ''}`} style={{ left: pos.x, top: pos.y }}>
       <div className="trends-head" onPointerDown={startDrag} onPointerMove={onDrag} onPointerUp={endDrag}>
         <span className="trends-title">
           {data ? data.name : 'Species trends'}
@@ -84,71 +132,150 @@ export default function TrendsPanel({
           onCountryFilterChange={onCountryFilterChange}
         />
 
+        {speciesCode && (
+          <a className="ebird-link" href={speciesUrl(speciesCode)} target="_blank" rel="noopener noreferrer">
+            View on eBird ↗
+          </a>
+        )}
+
         {!speciesCode && <p className="trends-note">Pick a species to see its trend.</p>}
         {speciesCode && trends.isLoading && <p className="trends-note">Loading…</p>}
         {speciesCode && trends.isError && <p className="trends-note error">{trends.error.message}</p>}
 
         {years && (
-          <>
-            <div className="trends-stats">
-              <div className="trends-stat">
-                <span className="trends-stat-label">First recorded</span>
-                <span className="trends-stat-value">{firstYear}</span>
+          <div className="trends-columns">
+            <div className="trends-col">
+              <div className="trends-stats">
+                <div className="trends-stat">
+                  <span className="trends-stat-label">First recorded</span>
+                  <span className="trends-stat-value">{firstYear}</span>
+                </div>
+                <div className="trends-stat">
+                  <span className="trends-stat-label">Most recent</span>
+                  <span className="trends-stat-value">{lastYear}</span>
+                </div>
+                <div className="trends-stat">
+                  <span className="trends-stat-label">Total reports</span>
+                  <span className="trends-stat-value">{data.records.toLocaleString()}</span>
+                </div>
               </div>
-              <div className="trends-stat">
-                <span className="trends-stat-label">Most recent</span>
-                <span className="trends-stat-value">{lastYear}</span>
+
+              <div className="trends-chart-head">
+                <span>Reports per year</span>
+                {hasOlderData && (
+                  <button type="button" className="trends-toggle" onClick={() => setFullHistory((f) => !f)}>
+                    {fullHistory ? `Since ${RECENT_START}` : `Full history, since ${firstYear}`}
+                  </button>
+                )}
               </div>
-              <div className="trends-stat">
-                <span className="trends-stat-label">Total reports</span>
-                <span className="trends-stat-value">{data.records.toLocaleString()}</span>
+              <svg
+                className="trends-chart"
+                viewBox={`0 0 ${chartYears.length * BAR} ${CHART_HEIGHT + 14}`}
+                role="img"
+                aria-label="Reports per year"
+              >
+                {chartYears.map(({ yr, n }, i) => {
+                  const h = maxN > 0 ? Math.max(1, (n / maxN) * CHART_HEIGHT) : 0
+                  return <rect key={yr} className="bar" x={i * BAR} y={CHART_HEIGHT - h} width={BAR - 2} height={h} />
+                })}
+                {chartYears.map(({ yr }, i) =>
+                  yr % tickEvery === 0 ? (
+                    <text key={yr} x={i * BAR} y={CHART_HEIGHT + 12}>
+                      {yr}
+                    </text>
+                  ) : null,
+                )}
+              </svg>
+              <div className="trends-chart-note">
+                eBird reports were sparse before 2000. Counts are not a reliable gauge of the species' actual range
+                or abundance that far back.
               </div>
+              
             </div>
 
-            <div className="trends-chart-head">
-              <span>Reports per year</span>
-              {hasOlderData && (
-                <button type="button" className="trends-toggle" onClick={() => setFullHistory((f) => !f)}>
-                  {fullHistory ? `Since ${RECENT_START}` : `Full history, since ${firstYear}`}
-                </button>
+            <div className="trends-col">
+              {flyway && (
+                <>
+                  <div className="trends-chart-head">
+                    <span>Where, by week</span>
+                    <button type="button" className="trends-toggle" onClick={() => setLogScale((l) => !l)}>
+                      {logScale ? 'Linear scale' : 'Log scale'}
+                    </button>
+                  </div>
+                  <svg
+                    className="flyway-chart"
+                    viewBox={`0 0 ${WEEKS * FLYWAY_BAR} ${FLYWAY_HEIGHT + 12}`}
+                    role="img"
+                    aria-label="Effort-corrected share of reports by week, for the top reporting countries"
+                  >
+                    {flyway.series.map((s, i) => (
+                      <polyline
+                        key={s.cc}
+                        className="flyway-line"
+                        style={{ stroke: COUNTRY_LINE_COLORS[i] }}
+                        points={flywayScaled[i]
+                          .map((v, w) => {
+                            const h = flywayMax > 0 ? (v / flywayMax) * FLYWAY_HEIGHT : 0
+                            return `${w * FLYWAY_BAR},${FLYWAY_HEIGHT - h}`
+                          })
+                          .join(' ')}
+                      />
+                    ))}
+                    {MONTH_STARTS.map(([w, label]) => (
+                      <text key={label} x={(w - 1) * FLYWAY_BAR} y={FLYWAY_HEIGHT + 10}>
+                        {label}
+                      </text>
+                    ))}
+                  </svg>
+                  <ul className="flyway-legend">
+                    {flyway.series.map((s, i) => (
+                      <li key={s.cc}>
+                        <span className="flyway-swatch" style={{ background: COUNTRY_LINE_COLORS[i] }} />
+                        {countryName(s.cc)}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="trends-chart-note">
+                    Each line is that country's share of this species' reports, divided by all-species activity in
+                    the same country and week, making it comparable across countries regardless of how many birders each has.
+                  </div>
+                </>
               )}
+
             </div>
-            <svg
-              className="trends-chart"
-              viewBox={`0 0 ${chartYears.length * BAR} ${CHART_HEIGHT + 14}`}
-              role="img"
-              aria-label="Reports per year"
-            >
-              {chartYears.map(({ yr, n }, i) => {
-                const h = maxN > 0 ? Math.max(1, (n / maxN) * CHART_HEIGHT) : 0
-                return <rect key={yr} className="bar" x={i * BAR} y={CHART_HEIGHT - h} width={BAR - 2} height={h} />
-              })}
-              {chartYears.map(({ yr }, i) =>
-                yr % tickEvery === 0 ? (
-                  <text key={yr} x={i * BAR} y={CHART_HEIGHT + 12}>
-                    {yr}
-                  </text>
-                ) : null,
-              )}
-            </svg>
-            <div className="trends-chart-note">
-              eBird reports were sparse before 2000 — counts are not a reliable gauge of the species' actual range
-              or abundance that far back.
-            </div>
-          </>
+          </div>
         )}
 
-        {countries.length > 0 && (
+        {years && countries.length > 0 && (
           <div className="trends-countries">
             <div className="trends-subhead">Most reports by country</div>
-            <ol>
-              {countries.map(([cc, n]) => (
-                <li key={cc}>
-                  <span>{cc}</span>
-                  <span className="trends-count">{n.toLocaleString()}</span>
-                </li>
-              ))}
-            </ol>
+            <div className="trends-pie-row">
+              <svg className="trends-pie" viewBox="-1 -1 2 2" role="img" aria-label="Share of reports by country">
+                {pieSlices(pieCountries.map(([, n]) => n)).map((s, i) =>
+                  s.fraction >= 0.9999 ? (
+                    <circle key={pieCountries[i][0]} r="1" fill={PIE_COLORS[i]} />
+                  ) : (
+                    <path
+                      key={pieCountries[i][0]}
+                      d={slicePath(s.startAngle, s.endAngle)}
+                      fill={PIE_COLORS[i]}
+                      className="pie-slice"
+                    />
+                  ),
+                )}
+              </svg>
+              <ol className="trends-pie-legend">
+                {pieCountries.map(([cc, n], i) => (
+                  <li key={cc}>
+                    <span className="flyway-swatch" style={{ background: PIE_COLORS[i] }} />
+                    <span className="trends-pie-name">{cc === 'Other' ? cc : countryName(cc)}</span>
+                    <span className="trends-count">
+                      {n.toLocaleString()} · {Math.round((n / pieTotal) * 100)}%
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         )}
       </div>

@@ -14,3 +14,4 @@ export const getHistoricalSpecies = (code) => getJson(`range-fine/${code}.json.g
 export const getWeeklySpecies = (code) => getJson(`species/${code}.json.gz`)
 export const getCountryIndex = () => getJson('countries/index.json')
 export const getCountrySpecies = (cc) => getJson(`countries/${cc}.json.gz`)
+export const getEffortCountry = () => getJson('effort-country.json.gz')

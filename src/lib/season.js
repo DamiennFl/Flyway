@@ -64,6 +64,22 @@ export function regionSeries(season, effort, bounds) {
   return Array.from(reports, (n, w) => (total[w] >= MIN_EFFORT ? n / total[w] : 0))
 }
 
+// Raw all-species activity per cell at one week, for the effort/transparency overlay (no species,
+// no normalization - this *is* the denominator the other lenses divide by).
+export function effortCellsForWeek(effort, week) {
+  const w = week - 1
+  const rows = []
+  let max = 0
+  for (let i = 0; i < effort.lat.length; i++) {
+    const n = effort.week[i * WEEKS + w]
+    if (n > 0) {
+      rows.push({ lat: effort.lat[i] * effort.cell, lng: effort.lng[i] * effort.cell, n })
+      if (n > max) max = n
+    }
+  }
+  return { cells: rows.map((c) => ({ ...c, t: Math.log1p(c.n) / Math.log1p(max) })), cellSize: effort.cell }
+}
+
 export function weekLabel(week) {
   const start = new Date(2023, 0, 1 + (week - 1) * 7)
   const end = new Date(2023, 0, week === WEEKS ? 365 : week * 7)

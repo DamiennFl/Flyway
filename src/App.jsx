@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSpeciesObservations } from './api/ebird.js'
+import { getSpeciesObservations, speciesUrl } from './api/ebird.js'
 import {
   getEffort,
   getEffortFine,
@@ -10,7 +10,7 @@ import {
   getWeeklySpecies,
 } from './api/historical.js'
 import { aggregateCells, filterByCountry } from './lib/historical.js'
-import { buildEffortIndex, buildSpeciesSeason, regionSeries, weekLabel, WEEKS } from './lib/season.js'
+import { buildEffortIndex, buildSpeciesSeason, effortCellsForWeek, regionSeries, weekLabel, WEEKS } from './lib/season.js'
 import { buildInterpolation, waveCellsFine, weekCellsFine } from './lib/fineField.js'
 import { buildEraCounts, compareEras } from './lib/compare.js'
 import { buildWave } from './lib/wave.js'
@@ -48,6 +48,10 @@ const NOTES = {
     'Colors show the first (arrival) or last (departure) week when the species’ share of reports is at least half its yearly peak. ',
 }
 
+const EFFORT_NOTE =
+  'This is where and when people go birding, not where birds actually are. Every species view on this ' +
+  'map divides by this same baseline to correct for it. '
+
 export default function App() {
   const [speciesCode, setSpeciesCode] = useState('')
   const [view, setView] = useState('recent')
@@ -71,15 +75,18 @@ export default function App() {
   }, [speciesCode])
 
   const showingHistory = view === 'historical'
+  const showingEffort = view === 'effort'
+  const showingRecent = view === 'recent'
   const needsWeekly = showingHistory && (lens === 'week' || lens === 'wave') && Boolean(speciesCode)
   const needsFine = showingHistory && lens === 'compare' && Boolean(speciesCode)
   const slider = lens === 'week' || lens === 'wave'
+  const showSlider = (showingHistory && speciesCode && slider) || showingEffort
   const region = countryFilter ?? DEFAULT_REGION
 
   const sightings = useQuery({
     queryKey: ['species', region, speciesCode],
     queryFn: () => getSpeciesObservations(speciesCode, region),
-    enabled: !showingHistory && Boolean(speciesCode),
+    enabled: showingRecent && Boolean(speciesCode),
   })
 
   const history = useQuery({
@@ -96,7 +103,12 @@ export default function App() {
     staleTime: Infinity,
   })
 
-  const effort = useQuery({ queryKey: ['effort'], queryFn: getEffort, enabled: needsWeekly, staleTime: Infinity })
+  const effort = useQuery({
+    queryKey: ['effort'],
+    queryFn: getEffort,
+    enabled: needsWeekly || showingEffort,
+    staleTime: Infinity,
+  })
   const effortFine = useQuery({ queryKey: ['effort-fine'], queryFn: getEffortFine, enabled: needsFine, staleTime: Infinity })
 
   const historyData = useMemo(() => filterByCountry(history.data, countryFilter), [history.data, countryFilter])
@@ -108,6 +120,10 @@ export default function App() {
   )
   const fineAll = useMemo(() => (historyData ? aggregateCells(historyData, null) : null), [historyData])
 
+  const effortCells = useMemo(
+    () => (showingEffort && effort.data ? effortCellsForWeek(effort.data, week) : null),
+    [showingEffort, effort.data, week],
+  )
   const effortIndex = useMemo(() => (effort.data ? buildEffortIndex(effort.data) : null), [effort.data])
   const fineIndex = useMemo(() => (effortFine.data ? buildEffortIndex(effortFine.data) : null), [effortFine.data])
   const interp = useMemo(
@@ -145,10 +161,10 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!playing || !slider || !season) return
+    if (!playing || !showSlider || (!showingEffort && !season)) return
     const id = setInterval(() => setWeek((w) => (w % WEEKS) + 1), PLAY_INTERVAL_MS)
     return () => clearInterval(id)
-  }, [playing, slider, season])
+  }, [playing, showSlider, showingEffort, season])
 
   let displayCells = aggregated.cells
   let displayCellSize = aggregated.cellSize
@@ -160,10 +176,11 @@ export default function App() {
     if (lens === 'wave') [displayCells, palette, legendMode] = [waveCellList, 'wave', 'wave']
   }
   if (compareReady) [displayCells, displayCellSize, palette, legendMode] = [comparison?.cells ?? [], fineIndex.cell, 'diverging', 'compare']
-  if (!showingHistory) legendMode = 'recent'
+  if (showingRecent) legendMode = 'recent'
+  if (showingEffort) [displayCells, displayCellSize, palette, legendMode] = [effortCells?.cells ?? [], effortCells?.cellSize ?? 0.5, 'density', 'effort']
 
   const recentPoints = sightings.data ?? []
-  const hasPoints = showingHistory ? displayCells.length > 0 : recentPoints.length > 0
+  const hasPoints = showingRecent ? recentPoints.length > 0 : displayCells.length > 0
   const eras = meta.data?.eras ?? []
   const eraLabel = (id) => eras.find((e) => e.id === id)?.label
   const loadError = weekly.error ?? effort.error ?? effortFine.error
@@ -184,7 +201,11 @@ export default function App() {
       {sidebarOpen && (
       <aside className="panel">
         <h1>Flyway</h1>
-        <p>Bird migration, month by month.</p>
+        {<p>Bird historical data and migration patterns.</p>}
+
+        <button type="button" className="action" onClick={() => setView(showingEffort ? 'recent' : 'effort')}>
+          {showingEffort ? 'Back to species view' : 'Show birding effort'}
+        </button>
 
         <SpeciesSelect
           species={index.data ?? []}
@@ -196,6 +217,12 @@ export default function App() {
         />
 
         {speciesCode && (
+          <a className="ebird-link" href={speciesUrl(speciesCode)} target="_blank" rel="noopener noreferrer">
+            View on eBird ↗
+          </a>
+        )}
+
+        {speciesCode && !showingEffort && (
           <button type="button" className="action" onClick={() => setView(showingHistory ? 'recent' : 'historical')}>
             {showingHistory ? 'Back to last 30 days' : 'Show historical data'}
           </button>
@@ -261,14 +288,14 @@ export default function App() {
           </div>
         )}
 
-        {showingHistory && speciesCode && slider && (
+        {showSlider && (
           <SeasonPanel
             week={week}
             onWeek={setWeek}
             playing={playing}
             onTogglePlay={() => setPlaying((p) => !p)}
-            series={series}
-            loading={!season}
+            series={showingEffort ? null : series}
+            loading={showingEffort ? effort.isLoading : !season}
           />
         )}
 
@@ -277,12 +304,20 @@ export default function App() {
           {index.isError && <span className="error">{index.error.message}</span>}
           {index.data && `${index.data.length.toLocaleString()} species`}
 
-          {!showingHistory && speciesCode && sightings.isFetching && <div>Loading sightings…</div>}
-          {!showingHistory && sightings.isError && <div className="error">{sightings.error.message}</div>}
-          {!showingHistory && sightings.data && (
+          {showingRecent && speciesCode && sightings.isFetching && <div>Loading sightings…</div>}
+          {showingRecent && sightings.isError && <div className="error">{sightings.error.message}</div>}
+          {showingRecent && sightings.data && (
             <div>
               {recentPoints.length >= MAX_RESULTS && '>'}
               {recentPoints.length.toLocaleString()} sightings in {countryName(region)}, last 30 days
+            </div>
+          )}
+
+          {showingEffort && effort.isLoading && <div>Loading birding activity…</div>}
+          {showingEffort && effort.isError && <div className="error">{effort.error.message}</div>}
+          {showingEffort && effortCells && (
+            <div>
+              {effortCells.cells.length.toLocaleString()} cells with birding activity, {weekLabel(week)}
             </div>
           )}
 
@@ -319,9 +354,17 @@ export default function App() {
         </div>
 
         {hasPoints && <Legend mode={legendMode} />}
+        
+        {showingRecent && sightings.data && (
+          <p className="note">{NOTES.all}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, last 30 days.</p>
+        )}
 
         {showingHistory && history.data && (
           <p className="note">{NOTES[lens]}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, through 2024.</p>
+        )}
+
+        {showingEffort && effortCells && (
+          <p className="note">{EFFORT_NOTE}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, through 2024.</p>
         )}
       </aside>
       )}

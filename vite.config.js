@@ -25,4 +25,9 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['maplibre-gl'],
   },
+  test: {
+    environment: 'node',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+  },
 })

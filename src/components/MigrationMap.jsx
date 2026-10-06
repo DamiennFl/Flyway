@@ -26,7 +26,9 @@ const RECENT_LAYER = {
 
 // Zoomed far out, a cell is under a pixel wide and map tiling drops polygons that small, so cells are drawn
 // as dots there. From the switch zoom on they are drawn as real squares (dots leave gaps between rows).
-const squareZoomFor = (cellSize) => (cellSize >= 0.5 ? 2 : 4)
+// Coarse (0.5 degree, e.g. the effort view) cells switch later than fine ones: the gapped dot grid at that
+// scale reads as a deliberate texture, not a rendering limitation, so it's kept longer.
+const squareZoomFor = (cellSize) => (cellSize >= 0.5 ? 5 : 4)
 
 // Dots beyond this many are thinned (the same cells every time, so nothing flickers) and drawn larger.
 const MAX_DOTS = 40000
@@ -44,7 +46,7 @@ function cellLayers(squareZoom, color, dotScale) {
       paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 0, 0.8 * dotScale, squareZoom, 1.3 * dotScale],
         'circle-color': color,
-        'circle-opacity': 0.9,
+        'circle-opacity': 0.75,
       },
     },
     squares: {
@@ -52,7 +54,7 @@ function cellLayers(squareZoom, color, dotScale) {
       type: 'fill',
       minzoom: squareZoom,
       layout: { 'fill-sort-key': ['get', 'n'] },
-      paint: { 'fill-color': color, 'fill-opacity': 0.9, 'fill-antialias': false },
+      paint: { 'fill-color': color, 'fill-opacity': 0.75, 'fill-antialias': false },
     },
   }
 }

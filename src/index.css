@@ -211,6 +211,18 @@ body {
   font-size: 11px;
 }
 
+.ebird-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ebird-link:hover {
+  text-decoration: underline;
+}
+
 .action {
   width: 100%;
   margin-top: 8px;
@@ -405,6 +417,21 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   backdrop-filter: blur(8px);
+  transition: width 0.15s ease;
+}
+
+.trends-wide {
+  width: 680px;
+}
+
+.trends-columns {
+  display: flex;
+  gap: 20px;
+}
+
+.trends-col {
+  flex: 1;
+  min-width: 0;
 }
 
 .trends-head {
@@ -527,6 +554,60 @@ body {
   color: var(--muted);
 }
 
+.best-time-place {
+  margin-top: 14px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(94, 224, 193, 0.1);
+  border: 1px solid rgba(94, 224, 193, 0.35);
+  border-radius: 8px;
+}
+
+.best-time-place strong {
+  color: var(--accent);
+}
+
+.flyway-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 6px;
+}
+
+.flyway-line {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.flyway-chart text {
+  font-size: 7px;
+  fill: var(--muted);
+}
+
+.flyway-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.flyway-legend li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flyway-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
 .trends-countries {
   margin-top: 14px;
 }
@@ -536,18 +617,49 @@ body {
   color: var(--muted);
 }
 
-.trends-countries ol {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: country;
+.trends-countries {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
-.trends-countries li {
+.trends-pie-row {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-top: 10px;
+}
+
+.trends-pie {
+  flex: 0 0 240px;
+  width: 240px;
+  height: 240px;
+}
+
+.pie-slice {
+  stroke: var(--panel);
+  stroke-width: 0.01;
+}
+
+.trends-pie-legend {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trends-pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 3px 0;
   font-size: 13px;
+}
+
+.trends-pie-name {
+  flex: 1;
+  min-width: 0;
 }
 
 .trends-count {

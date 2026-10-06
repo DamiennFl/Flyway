@@ -7,6 +7,7 @@ const SCALES = {
   season: { gradient: PALETTES.density.gradient, labels: ['Rarer', 'More common'] },
   compare: { gradient: PALETTES.diverging.gradient, labels: ['8x less common', 'Same', '8x more common'] },
   wave: { gradient: PALETTES.wave.gradient, labels: ['Jan', 'Apr', 'Jul', 'Oct', 'Dec'] },
+  effort: { gradient: PALETTES.density.gradient, labels: ['Less birding activity', 'More birding activity'] },
 }
 
 export default function Legend({ mode }) {
