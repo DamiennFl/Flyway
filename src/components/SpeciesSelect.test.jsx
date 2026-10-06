@@ -94,4 +94,15 @@ describe('SpeciesSelect', () => {
     await waitFor(() => expect(screen.queryByText('American Robin')).not.toBeInTheDocument())
     expect(screen.getByText('Blue Jay')).toBeInTheDocument()
   })
+
+  it('lists every species in the chosen country, most reported there first, not just the top 50', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 80 }, (_, i) => ({ code: `sp${i}`, name: `Bird ${i}`, sci: `Avis ${i}`, n: i, c: ['JP'] }))
+    // In this country the least reported overall (sp0) is the most reported there.
+    getCountrySpecies.mockResolvedValue({ species: many.map((s) => [s.code, s.name, 1]) })
+    renderSelect({ countryFilter: 'JP', species: many })
+    await user.click(screen.getByPlaceholderText('Search species…'))
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(80))
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Bird 0')
+  })
 })

@@ -104,6 +104,8 @@ a:focus-visible,
 
 /* The legend sheet: docked to the left edge like the margin of a printed map. */
 .panel {
+  display: flex;
+  flex-direction: column;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -336,9 +338,22 @@ a:focus-visible,
   margin-top: 0.75rem;
 }
 
+.picker-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.species-count {
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .ebird-link {
   display: inline-block;
-  margin-top: 0.5rem;
   font-family: var(--font-display);
   font-size: 0.9rem;
   font-weight: 600;
@@ -367,8 +382,15 @@ a:focus-visible,
   cursor: pointer;
 }
 
-.action:hover {
+.action:hover:not(:disabled) {
   background: var(--stamp);
+}
+
+.action:disabled {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: default;
 }
 
 .status {
@@ -933,4 +955,58 @@ a:focus-visible,
 
 .maplibregl-ctrl-attrib-button {
   filter: invert(1);
+}
+
+/* The effort switch sits at the foot of the sheet, whatever the height of the controls above it. */
+.effort-switch {
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.panel .effort-switch .action {
+  margin-top: 0;
+}
+
+.panel .action-hint {
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+/* Hover popup for a map cell. */
+.cell-popup {
+  pointer-events: none;
+}
+
+.cell-popup .maplibregl-popup-content {
+  padding: 0.5rem 0.7rem;
+  color: var(--ink);
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: var(--hard-shadow);
+}
+
+.cell-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--sheet);
+}
+
+.cell-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.cell-info strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-stretch: 80%;
+}
+
+.cell-info span {
+  color: var(--muted);
 }

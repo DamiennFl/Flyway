@@ -203,27 +203,36 @@ export default function App() {
         <h1>Flyway</h1>
         {<p>Bird historical data and migration patterns.</p>}
 
-        <button type="button" className="action" onClick={() => setView(showingEffort ? 'recent' : 'effort')}>
-          {showingEffort ? 'Back to species view' : 'Show birding effort'}
-        </button>
-
-        <SpeciesSelect
-          species={index.data ?? []}
-          value={speciesCode}
-          onChange={setSpeciesCode}
-          disabled={index.isLoading || index.isError}
-          countryFilter={countryFilter}
-          onCountryFilterChange={setCountryFilter}
-        />
-
-        {speciesCode && (
-          <a className="ebird-link" href={speciesUrl(speciesCode)} target="_blank" rel="noopener noreferrer">
-            View on eBird ↗
-          </a>
+        {/* Birding effort is the same for every bird, so the picker only shows in the species views. */}
+        {!showingEffort && (
+          <SpeciesSelect
+            species={index.data ?? []}
+            value={speciesCode}
+            onChange={setSpeciesCode}
+            disabled={index.isLoading || index.isError}
+            countryFilter={countryFilter}
+            onCountryFilterChange={setCountryFilter}
+          />
         )}
 
-        {speciesCode && !showingEffort && (
-          <button type="button" className="action" onClick={() => setView(showingHistory ? 'recent' : 'historical')}>
+        {!showingEffort && (
+          <div className="picker-meta">
+            {speciesCode && (
+              <a className="ebird-link" href={speciesUrl(speciesCode)} target="_blank" rel="noopener noreferrer">
+                View on eBird ↗
+              </a>
+            )}
+            {index.data && <span className="species-count">{index.data.length.toLocaleString()} species</span>}
+          </div>
+        )}
+
+        {!showingEffort && (
+          <button
+            type="button"
+            className="action"
+            disabled={!speciesCode}
+            onClick={() => setView(showingHistory ? 'recent' : 'historical')}
+          >
             {showingHistory ? 'Back to last 30 days' : 'Show historical data'}
           </button>
         )}
@@ -302,7 +311,6 @@ export default function App() {
         <div className="status">
           {index.isLoading && 'Loading species…'}
           {index.isError && <span className="error">{index.error.message}</span>}
-          {index.data && `${index.data.length.toLocaleString()} species`}
 
           {showingRecent && speciesCode && sightings.isFetching && <div>Loading sightings…</div>}
           {showingRecent && sightings.isError && <div className="error">{sightings.error.message}</div>}
@@ -366,6 +374,17 @@ export default function App() {
         {showingEffort && effortCells && (
           <p className="note">{EFFORT_NOTE}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, through 2024.</p>
         )}
+
+        <div className="effort-switch">
+          <button type="button" className="action" onClick={() => setView(showingEffort ? 'recent' : 'effort')}>
+            {showingEffort ? 'Back to species view' : 'Show birding effort'}
+          </button>
+          <p className="action-hint">
+            {showingEffort
+              ? 'Return to the map for a single species.'
+              : 'Map where and when people go birding, across all species.'}
+          </p>
+        </div>
       </aside>
       )}
       <TrendsPanel
@@ -384,6 +403,7 @@ export default function App() {
         cells={displayCells}
         stableCount={ready && slider ? fineAll.cells.length : displayCells.length}
         cellSize={displayCellSize}
+        statMode={legendMode}
         palette={palette}
         fitCells={aggregated.cells}
         fitKey={historyData}

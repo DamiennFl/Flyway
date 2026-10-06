@@ -27,7 +27,15 @@ export default function SpeciesSelect({ species, value, onChange, disabled, coun
   }, [species, countryFilter, countrySpecies.data])
 
   const selected = species.find((s) => s.code === value)
-  const popular = useMemo(() => [...filteredSpecies].sort((a, b) => b.n - a.n).slice(0, MAX_SHOWN), [filteredSpecies])
+  // With no search text: every species reported in the chosen country, most reported there first (the country
+  // file is already in that order); otherwise just the most reported species overall.
+  const popular = useMemo(() => {
+    if (countryFilter && countrySpecies.data) {
+      const rank = new Map(countrySpecies.data.species.map(([code], i) => [code, i]))
+      return [...filteredSpecies].sort((a, b) => rank.get(a.code) - rank.get(b.code))
+    }
+    return [...filteredSpecies].sort((a, b) => b.n - a.n).slice(0, MAX_SHOWN)
+  }, [filteredSpecies, countryFilter, countrySpecies.data])
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
