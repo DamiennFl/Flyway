@@ -1,6 +1,7 @@
 import { AGE_CSS_GRADIENT, MAX_AGE_DAYS } from '../lib/ageScale.js'
 import { PALETTES } from '../lib/palettes.js'
 
+// Constants for normalizing scales for bird data to ensure visualizations are not skewed.
 const SCALES = {
   recent: { gradient: AGE_CSS_GRADIENT, labels: ['Today', `${MAX_AGE_DAYS} days ago`] },
   historical: { gradient: PALETTES.density.gradient, labels: ['Fewer reports', 'More reports'] },
@@ -10,6 +11,7 @@ const SCALES = {
   effort: { gradient: PALETTES.density.gradient, labels: ['Less birding activity', 'More birding activity'] },
 }
 
+// Legend div
 export default function Legend({ mode }) {
   const { gradient, labels } = SCALES[mode]
 
