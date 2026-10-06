@@ -1,3 +1,5 @@
+// Variables for coloring dots/squares based on density
+
 export const DENSITY_STOPS = [
   [0, '#7b4fb3'],
   [0.35, '#3a7bd5'],
