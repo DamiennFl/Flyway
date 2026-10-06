@@ -7,3 +7,4 @@ dist
 data-build/
 __pycache__/
 .vibe-wise/
+upload_data.ps1
