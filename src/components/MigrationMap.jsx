@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Map, { Source, Layer } from 'react-map-gl/maplibre'
 import { AGE_COLOR_EXPRESSION, ageInDays } from '../lib/ageScale.js'
 import { PALETTES } from '../lib/palettes.js'
+import { tintStyle } from '../lib/basemap.js'
 
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
 const INITIAL_VIEW = {
   longitude: -96,
@@ -20,7 +21,7 @@ const RECENT_LAYER = {
     'circle-color': AGE_COLOR_EXPRESSION,
     'circle-opacity': 0.75,
     'circle-stroke-width': 0.5,
-    'circle-stroke-color': '#0b0f14',
+    'circle-stroke-color': '#0f1d19',
   },
 }
 
@@ -88,6 +89,7 @@ export default function MigrationMap({
   onBoundsChange,
 }) {
   const mapRef = useRef(null)
+  const [mapStyle, setMapStyle] = useState(MAP_STYLE_URL)
   const [view, setView] = useState({ zoom: INITIAL_VIEW.zoom, bounds: null })
   const squareZoom = squareZoomFor(cellSize)
   const stride = Math.max(1, Math.ceil(stableCount / MAX_DOTS))
@@ -96,6 +98,18 @@ export default function MigrationMap({
     () => cellLayers(squareZoom, PALETTES[palette].expression, dotScale),
     [squareZoom, palette, dotScale],
   )
+
+  // Load the stock style and retint it; the stock style stays as the fallback if that fails.
+  useEffect(() => {
+    let cancelled = false
+    fetch(MAP_STYLE_URL)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.statusText))))
+      .then((style) => !cancelled && setMapStyle(tintStyle(style)))
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Zoom to the species' range when its historical data loads (not when the era filter or week changes).
   useEffect(() => {
@@ -167,7 +181,7 @@ export default function MigrationMap({
     <Map
       ref={mapRef}
       initialViewState={INITIAL_VIEW}
-      mapStyle={MAP_STYLE}
+      mapStyle={mapStyle}
       style={{ width: '100%', height: '100%' }}
       onLoad={reportView}
       onMoveEnd={reportView}

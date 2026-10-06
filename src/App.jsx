@@ -325,7 +325,7 @@ export default function App() {
           {showingHistory && history.isError && <div className="error">{history.error.message}</div>}
           {showingHistory && lens === 'all' && history.data && (
             <div>
-              {aggregated.cells.length.toLocaleString()} map cells · {aggregated.total.toLocaleString()} records
+              {aggregated.cells.length.toLocaleString()} map cells from {aggregated.total.toLocaleString()} records
             </div>
           )}
 
