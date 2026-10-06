@@ -1,6 +1,8 @@
 const BASE_URL = 'https://api.ebird.org/v2'
 const API_KEY = import.meta.env.VITE_EBIRD_API_KEY
 
+export const speciesUrl = (code) => new URL(`https://ebird.org/species/${code}`).toString()
+
 async function ebirdFetch(path, params = {}) {
   if (!API_KEY) throw new Error('Missing VITE_EBIRD_API_KEY — add it to .env and restart the dev server')
 
