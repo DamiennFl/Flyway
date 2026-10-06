@@ -9,7 +9,9 @@ import { WEEKS, weekLabel } from '../lib/season.js'
 import SpeciesSelect from './SpeciesSelect.jsx'
 
 const CHART_HEIGHT = 90
-const BAR = 12
+// The chart is always this wide in viewBox units (about its on-screen width), so the labels stay readable
+// however many years are shown; the bars share the width.
+const CHART_WIDTH = 300
 const RECENT_START = 2000
 
 const FLYWAY_HEIGHT = 56
@@ -17,7 +19,7 @@ const FLYWAY_BAR = 5
 const MONTH_STARTS = [[1, 'Jan'], [14, 'Apr'], [27, 'Jul'], [40, 'Oct']]
 
 const PIE_MAX = 8
-const PIE_COLORS = [...COUNTRY_LINE_COLORS, '#9b7ede', '#6ec1e4', '#e0e0e0', '#7a8190']
+const PIE_COLORS = [...COUNTRY_LINE_COLORS, '#a58bd0', '#b9a98a', '#d3ddd0', '#6f7f78']
 
 function slicePath(start, end) {
   const x1 = Math.cos(start)
@@ -38,8 +40,9 @@ export default function TrendsPanel({
   countryFilter,
   onCountryFilterChange,
 }) {
-  const [pos, setPos] = useState({ x: 312, y: 70 })
+  const [pos, setPos] = useState({ x: 344, y: 70 })
   const [fullHistory, setFullHistory] = useState(false)
+  const [hoverYear, setHoverYear] = useState(null)
   const [logScale, setLogScale] = useState(false)
   const dragRef = useRef(null)
 
@@ -84,6 +87,7 @@ export default function TrendsPanel({
     : []
   const maxN = chartYears.length ? Math.max(...chartYears.map((d) => d.n)) : 0
   const tickEvery = fullHistory ? 20 : 5
+  const hovered = chartYears.find((d) => d.yr === hoverYear)
 
   const flyway =
     data && effortCountry.data && countries.length
@@ -168,19 +172,42 @@ export default function TrendsPanel({
                   </button>
                 )}
               </div>
+              <div className="trends-readout" aria-live="polite">
+                {hovered ? (
+                  <>
+                    <strong>{hovered.yr}</strong> {hovered.n.toLocaleString()} {hovered.n === 1 ? 'report' : 'reports'}
+                  </>
+                ) : (
+                  'Hover over a bar to see its count.'
+                )}
+              </div>
               <svg
                 className="trends-chart"
-                viewBox={`0 0 ${chartYears.length * BAR} ${CHART_HEIGHT + 14}`}
+                viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT + 16}`}
                 role="img"
                 aria-label="Reports per year"
+                onMouseLeave={() => setHoverYear(null)}
               >
                 {chartYears.map(({ yr, n }, i) => {
                   const h = maxN > 0 ? Math.max(1, (n / maxN) * CHART_HEIGHT) : 0
-                  return <rect key={yr} className="bar" x={i * BAR} y={CHART_HEIGHT - h} width={BAR - 2} height={h} />
+                  const step = CHART_WIDTH / chartYears.length
+                  return (
+                    <g key={yr} onMouseEnter={() => setHoverYear(yr)}>
+                      {/* Full-height hit area, so thin bars and tiny counts are still easy to point at. */}
+                      <rect className="bar-hit" x={i * step} y={0} width={step} height={CHART_HEIGHT} />
+                      <rect
+                        className={`bar${yr === hoverYear ? ' active' : ''}`}
+                        x={i * step}
+                        y={CHART_HEIGHT - h}
+                        width={Math.max(0.5, step - Math.min(2, step * 0.2))}
+                        height={h}
+                      />
+                    </g>
+                  )
                 })}
                 {chartYears.map(({ yr }, i) =>
                   yr % tickEvery === 0 ? (
-                    <text key={yr} x={i * BAR} y={CHART_HEIGHT + 12}>
+                    <text key={yr} x={i * (CHART_WIDTH / chartYears.length)} y={CHART_HEIGHT + 13}>
                       {yr}
                     </text>
                   ) : null,

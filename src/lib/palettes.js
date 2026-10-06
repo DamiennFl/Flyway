@@ -7,20 +7,20 @@ const stops = (list) => ({
 
 // Orange = less common, grey = no change, teal = more common (readable for most color blindness).
 const diverging = stops([
-  [0, '#ff7a3d'],
-  [0.25, '#c9805a'],
-  [0.5, '#6f7b8a'],
-  [0.75, '#4fb3c4'],
-  [1, '#2de0c4'],
+  [0, '#ff7a33'],
+  [0.25, '#c98a5c'],
+  [0.5, '#6f7f78'],
+  [0.75, '#6fb5cf'],
+  [1, '#b4ecf5'],
 ])
 
 // Week of the year: winter blue, spring green, summer yellow, autumn orange, late autumn pink.
 const wave = stops([
-  [0, '#4a6fe3'],
-  [0.25, '#5ee0a0'],
-  [0.5, '#ffe45e'],
-  [0.75, '#ff8a4c'],
-  [1, '#d94f9a'],
+  [0, '#5b8fd6'],
+  [0.25, '#8fb56a'],
+  [0.5, '#f0dc6a'],
+  [0.75, '#ff7a33'],
+  [1, '#c25a8a'],
 ])
 
 export const PALETTES = {

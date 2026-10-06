@@ -1,10 +1,10 @@
 export const MAX_AGE_DAYS = 30
 
 export const AGE_STOPS = [
-  [0, '#ffe45e'],
-  [7, '#5ee0c1'],
-  [15, '#3a7bd5'],
-  [30, '#7b4fb3'],
+  [0, '#ff7a33'],
+  [7, '#e6d58a'],
+  [15, '#7cc4de'],
+  [30, '#4a6a9a'],
 ]
 
 const DAY_MS = 24 * 60 * 60 * 1000

@@ -132,4 +132,19 @@ describe('TrendsPanel', () => {
     )
     expect(getWeeklySpecies).not.toHaveBeenCalled()
   })
+
+  it('shows the report count for a year when hovering its bar', async () => {
+    renderPanel()
+    await waitFor(() => expect(document.querySelector('.trends-chart')).toBeInTheDocument())
+    expect(screen.getByText('Hover over a bar to see its count.')).toBeInTheDocument()
+
+    const hits = document.querySelectorAll('.trends-chart .bar-hit')
+    await userEvent.hover(hits[2])
+    expect(document.querySelector('.trends-readout').textContent).toBe('2020 100 reports')
+
+    await userEvent.unhover(hits[2])
+    await userEvent.hover(document.querySelector('.trends-chart'))
+    await userEvent.unhover(document.querySelector('.trends-chart'))
+    expect(screen.getByText('Hover over a bar to see its count.')).toBeInTheDocument()
+  })
 })

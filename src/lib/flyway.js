@@ -3,7 +3,7 @@ import { WEEKS } from './season.js'
 // Weeks with less country-wide activity than this are too thin to trust as a denominator.
 const MIN_COUNTRY_EFFORT = 20
 
-export const COUNTRY_LINE_COLORS = ['#5ee0c1', '#ffe45e', '#ff8a4c', '#4a6fe3', '#d94f9a']
+export const COUNTRY_LINE_COLORS = ['#7cc4de', '#e6d58a', '#ff7a33', '#8fb56a', '#c25a8a']
 
 // Effort-corrected share of a species' reports, by week, for its top reporting countries.
 // Matches the app's existing approach of dividing by all-species activity in the same place/time
