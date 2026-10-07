@@ -1,6 +1,9 @@
 # Flyway
 ## Bird and Migration Data Visualization
 
+<img width="1916" height="942" alt="image" src="https://github.com/user-attachments/assets/b1ad3517-b10c-44ae-98f6-42cf525c63e6" />
+
+
 ## Scope
 
 Flyway is an interactive map for exploring where birds are and how that has changed over time, for more than 10,000 species. For any species you can see its sightings from the last 30 days, its historical range, how its presence shifts week by week, when it arrives and departs, and how its distribution has changed between eras from before 2000 to 2020-2024. A separate view maps birding effort itself, meaning where and when people go birding at all.
@@ -33,4 +36,4 @@ The frontend is a React 19 app built with Vite. It draws a MapLibre basemap thro
 
 ## Deployment
 
-Flyway is built with `npm run build` into a static bundle and hosted on damienf.com, with the Django view providing the recent-sightings endpoint. The data files are uploaded separately to Azure with a local script (not tracked in git). They are served as `application/json` with `Content-Encoding: gzip`, and the app finds them through `VITE_DATA_BASE_URL`. That variable defaults to `/data` for local development. MapLibre's worker is bundled with the app so the production build can start the map.
+Flyway is built with `npm run build` into a static bundle and hosted on damienf.com, with the Django view providing the recent-sightings endpoint. The data files are uploaded separately to Azure with a local script (not tracked in git). They are served as `application/json` with `Content-Encoding: gzip`, and the app finds them through `VITE_DATA_BASE_URL`. That variable defaults to `/data` for local development. MapLibre's worker is bundled with the app so the production build can start the map. It is possible to run this locally, I won't make a writeup to explain how though :).
