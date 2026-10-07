@@ -5,6 +5,7 @@ import { PALETTES } from '../lib/palettes.js'
 import { tintStyle } from '../lib/basemap.js'
 import { densestSpot, inBounds } from '../lib/densest.js'
 import { cellHeadline, cellRanges } from '../lib/cellInfo.js'
+import { sightingHeadline, sightingWhen } from '../lib/sightingInfo.js'
 
 const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
@@ -24,6 +25,27 @@ const RECENT_LAYER = {
     'circle-opacity': 0.75,
     'circle-stroke-width': 0.5,
     'circle-stroke-color': '#0f1d19',
+  },
+}
+
+// Recent dots are only a few pixels wide, so an invisible, larger copy on top is what the mouse hits.
+const RECENT_HIT_LAYER = {
+  id: 'sightings-hit',
+  type: 'circle',
+  layout: RECENT_LAYER.layout,
+  paint: { 'circle-radius': 9, 'circle-opacity': 0 },
+}
+
+// The hovered dot, ringed in white like a hovered cell.
+const SIGHTING_HOVER_LAYER = {
+  id: 'sighting-hover',
+  type: 'circle',
+  paint: {
+    'circle-radius': 8,
+    'circle-color': '#ffffff',
+    'circle-opacity': 0.18,
+    'circle-stroke-width': 2.5,
+    'circle-stroke-color': '#ffffff',
   },
 }
 
@@ -131,14 +153,22 @@ export default function MigrationMap({
     }
   }, [])
 
-  // A popup for a cell that is no longer on the map (new week, new species) would show stale numbers.
-  useEffect(() => setHover(null), [cells, mode])
+  // A popup for a cell or dot that is no longer on the map (new week, new species) would show stale numbers.
+  useEffect(() => setHover(null), [cells, sightings, mode])
 
-  function hoverCell(e) {
+  function hoverFeature(e) {
     const f = e.features?.[0]
     if (!f) return setHover(null)
+    if (mode === 'recent') {
+      const [lng, lat] = f.geometry.coordinates
+      const { howMany, obsDt } = f.properties
+      setHover((h) =>
+        h && h.lat === lat && h.lng === lng && h.obsDt === obsDt ? h : { kind: 'sighting', lat, lng, howMany, obsDt },
+      )
+      return
+    }
     const { lat, lng, n, t } = f.properties
-    setHover((h) => (h && h.lat === lat && h.lng === lng && h.n === n ? h : { lat, lng, n, t }))
+    setHover((h) => (h && h.lat === lat && h.lng === lng && h.n === n ? h : { kind: 'cell', lat, lng, n, t }))
   }
 
   // When a species loads (last 30 days or historical) and none of its points are in view, say a European bird
@@ -171,7 +201,7 @@ export default function MigrationMap({
         sightings.map((s) => ({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-          properties: { locName: s.locName, obsDt: s.obsDt, howMany: s.howMany, ageDays: ageInDays(s.obsDt) },
+          properties: { obsDt: s.obsDt, howMany: s.howMany, ageDays: ageInDays(s.obsDt) },
         })),
       ),
     [sightings],
@@ -212,8 +242,19 @@ export default function MigrationMap({
   }, [cells, cellSize, showSquares, view.bounds])
 
   const hoverShape = useMemo(
-    () => (hover ? collection([{ type: 'Feature', geometry: cellPolygon(hover, cellSize / 2), properties: {} }]) : EMPTY),
+    () =>
+      hover?.kind === 'cell'
+        ? collection([{ type: 'Feature', geometry: cellPolygon(hover, cellSize / 2), properties: {} }])
+        : EMPTY,
     [hover, cellSize],
+  )
+
+  const hoverPoint = useMemo(
+    () =>
+      hover?.kind === 'sighting'
+        ? collection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [hover.lng, hover.lat] }, properties: {} }])
+        : EMPTY,
+    [hover],
   )
 
   return (
@@ -224,15 +265,21 @@ export default function MigrationMap({
       style={{ width: '100%', height: '100%' }}
       onLoad={reportView}
       onMoveEnd={reportView}
-      interactiveLayerIds={mode === 'recent' ? [] : ['cell-dots', 'cell-squares']}
-      onMouseMove={hoverCell}
+      interactiveLayerIds={mode === 'recent' ? ['sightings-hit'] : ['cell-dots', 'cell-squares']}
+      onMouseMove={hoverFeature}
       onMouseLeave={() => setHover(null)}
       cursor={hover ? 'pointer' : ''}
     >
       {mode === 'recent' ? (
-        <Source key="sightings" id="sightings" type="geojson" data={recentData}>
-          <Layer {...RECENT_LAYER} />
-        </Source>
+        <>
+          <Source key="sightings" id="sightings" type="geojson" data={recentData}>
+            <Layer {...RECENT_LAYER} />
+            <Layer {...RECENT_HIT_LAYER} />
+          </Source>
+          <Source key="sighting-hover" id="sighting-hover" type="geojson" data={hoverPoint}>
+            <Layer {...SIGHTING_HOVER_LAYER} />
+          </Source>
+        </>
       ) : (
         <>
           <Source key="cell-dots" id="cell-dots" type="geojson" data={cellDots}>
@@ -247,21 +294,34 @@ export default function MigrationMap({
           </Source>
         </>
       )}
-      {hover && mode !== 'recent' && (
+      {hover && hover.kind === (mode === 'recent' ? 'sighting' : 'cell') && (
         <Popup
           longitude={hover.lng}
           latitude={hover.lat}
           anchor="bottom"
-          offset={8}
+          offset={hover.kind === 'sighting' ? 14 : 8}
           closeButton={false}
           closeOnClick={false}
           focusAfterOpen={false}
           className="cell-popup"
         >
-          <CellInfo cell={hover} cellSize={cellSize} statMode={statMode} />
+          {hover.kind === 'sighting' ? (
+            <SightingInfo sighting={hover} />
+          ) : (
+            <CellInfo cell={hover} cellSize={cellSize} statMode={statMode} />
+          )}
         </Popup>
       )}
     </Map>
+  )
+}
+
+function SightingInfo({ sighting }) {
+  return (
+    <div className="cell-info">
+      <strong>{sightingHeadline(sighting.howMany)}</strong>
+      <span>{sightingWhen(sighting.obsDt)}</span>
+    </div>
   )
 }
 
