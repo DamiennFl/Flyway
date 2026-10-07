@@ -1,29 +1,12 @@
-const BASE_URL = 'https://api.ebird.org/v2'
-const API_KEY = import.meta.env.VITE_EBIRD_API_KEY
-
 export const speciesUrl = (code) => new URL(`https://ebird.org/species/${code}`).toString()
 
-async function ebirdFetch(path, params = {}) {
-  if (!API_KEY) throw new Error('Missing VITE_EBIRD_API_KEY — add it to .env and restart the dev server')
-
-  const url = new URL(`${BASE_URL}${path}`)
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
-
-  const res = await fetch(url, { headers: { 'X-eBirdApiToken': API_KEY } })
-  if (!res.ok) throw new Error(`eBird ${res.status}: ${res.statusText}`)
-  return res.json()
-}
-
-// Most recent sighting of each species in the region (one record per species).
-export async function getRecentObservations(regionCode, { back = 30, maxResults = 10000 } = {}) {
-  const data = await ebirdFetch(`/data/obs/${regionCode}/recent`, { back, maxResults })
-  console.log(`[eBird] ${regionCode} recent: ${data.length} records`, data[0])
-  return data
-}
-
-// Every sighting of one species in the region (capped at maxResults).
-export async function getSpeciesObservations(speciesCode, regionCode, { back = 30, maxResults = 10000 } = {}) {
-  const data = await ebirdFetch(`/data/obs/${regionCode}/recent/${speciesCode}`, { back, maxResults })
+// Recent sightings come from this site's own API, which holds the eBird key so it never reaches the browser.
+// In development vite.config.js answers the same address by calling eBird with the key from .env.
+// Every sighting of one species in the region over the last 30 days (capped at 10,000).
+export async function getSpeciesObservations(speciesCode, regionCode) {
+  const res = await fetch(`/api/flyway/recent/${regionCode}/${speciesCode}/`)
+  if (!res.ok) throw new Error(`Recent sightings are unavailable right now (${res.status})`)
+  const data = await res.json()
   console.log(`[eBird] ${regionCode} ${speciesCode}: ${data.length} records`)
   return data
 }

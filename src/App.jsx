@@ -364,7 +364,13 @@ export default function App() {
         {hasPoints && <Legend mode={legendMode} />}
         
         {showingRecent && sightings.data && (
-          <p className="note">{NOTES.all}eBird data (Cornell Lab of Ornithology, CC BY 4.0) via GBIF, last 30 days.</p>
+          <p className="note">
+            {NOTES.all}Sightings from{' '}
+            <a href="https://ebird.org" target="_blank" rel="noopener noreferrer">
+              eBird
+            </a>{' '}
+            (Cornell Lab of Ornithology), last 30 days.
+          </p>
         )}
 
         {showingHistory && history.data && (
